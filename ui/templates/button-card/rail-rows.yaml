@@ -77,68 +77,80 @@ rail_station_row:
         - background: var(--accent-text-color)
   extra_styles: |
     [[[
-      var extra_styles = ''
-      for (let rail = 0; rail <= 4; rail++) {
-        var style = `
-          #rail${ rail } {
-            display: ${ (variables['rail' + rail + '_entity'] == null) ? 'none' : 'block' };
-            position: absolute;
-            left: ${ rail * 12 }px;
-            top:
-              ${ ((variables.station_rail == rail) && (variables.terminate_at.includes('top')))
-                  ? 'calc( 50% - ' + (4 * !(variables.terminate_at.includes('terminal'))) + 'px )' : '0' };
-            width: ${ ((variables.station_rail == rail) && !(variables.terminate_at.includes("terminal"))) ? (6 + (4 - rail) * 12) + "px" : "0" };
-            height:
-              ${ variables.station_rail == rail
-                  ? variables.terminate_at.includes("terminal")
-                    ? '50%'
-                    : variables.terminate_at.includes("top")
-                      ? 'calc( 50% + 4px )'
-                      : variables.terminate_at.includes("bottom")
-                        ? 'calc( 50% - 4px )'
-                        : '100%'
-                  : '100%'
-              };
-            box-shadow: 0px 0px 0px 2px rgba(var(--rgb-primary-background-color),0.5);
-            --rail-color:
-              ${ variables['rail' + rail + '_entity'] !== null
-                  ? states[variables['rail' + rail + '_entity']].attributes[variables.condition_attribute] !== undefined
-                    ? states[variables['rail' + rail + '_entity']].attributes[variables.condition_attribute] >= variables.condition_threshold
-                      ? variables.mid_color
-                      : variables.on_color
-                    : variables.off_color
-                  : 'transparent'
-              };
-            border-left: 8px solid var(--rail-color);
-            border-top: ${ ((variables.station_rail == rail) && (variables.terminate_at == "top")) ? "8px solid var(--rail-color)" : "none" };
-            border-bottom: ${ ((variables.station_rail == rail) && (variables.terminate_at == "bottom")) ? "8px solid var(--rail-color)" : "none" };
-            border-radius:
-              ${ variables.station_rail == rail
-                  ? variables.terminate_at == "top"
-                    ? (6 * (5 - rail)) + "px 0 0 0"
-                    : variables.terminate_at == "bottom"
-                      ? "0 0 0 " + (6 * (5 - rail)) + "px"
-                      : "0"
-                  : "0"
-              };
-          }
-        `
-        extra_styles = extra_styles + style
+      function getColor(entity) {
+        const attr = entity.attributes[variables.condition_attribute];
+        if (typeof attr == 'undefined' || attr == null) {
+          return variables.off_color;
+        } else if (attr >= variables.condition_threshold) {
+          return variables.mid_color;
+        } else {
+          return variables.on_color;
+        }
       }
-      var stationStyle = `
-        #station {
-          --station-color:
-            ${ entity != null
-                ? entity.attributes[variables.condition_attribute] !== undefined
-                  ? entity.attributes[variables.condition_attribute] >= variables.condition_threshold
-                    ? variables.mid_color
-                    : variables.on_color
-                  : variables.off_color
-                : 'transparent'
+
+      function buildStyle(id, styleObject) {
+        const styles = Object.keys(styleObject).map((key) => `${key}:${styleObject[key]}`).join(';');
+        return `#${id}{${styles}}`;
+      }
+
+      let extraStyles = '';
+
+      for (let rail = 0; rail <= 4; rail++) {
+        const railEntity = variables[`rail${rail}_entity`];
+        const isStationRail = variables.station_rail == rail;
+        const terminateAt = variables.terminate_at.split(' ');
+
+        const railStyle = {
+          'display': railEntity == null ? 'none' : 'block',
+          'position': 'absolute',
+          'left': `${rail * 12}px`,
+          'top': '0',
+          'width': '0',
+          'height': '100%',
+          'box-shadow': '0px 0px 0px 2px rgba(var(--rgb-primary-background-color), 0.5)',
+          'border-left': '8px solid var(--rail-color)',
+          'border-radius': '0',
+          '--rail-color': railEntity != null ? getColor(states[railEntity]) : 'transparent',
+        };
+
+        if (isStationRail) {
+          if (terminateAt.includes('top')) {
+            Object.assign(railStyle, {
+              'top': terminateAt.includes('terminal') ? '50%' : 'calc(50% - 4px)',
+            });
+          }
+
+          if (terminateAt.includes('terminal')) {
+            Object.assign(railStyle, {
+              'height': '50%',
+            });
+          } else {
+            if (terminateAt.includes('top')) {
+              Object.assign(railStyle, {
+                'border-top': '8px solid var(--rail-color)',
+                'border-radius': `${6 * (5 - rail)}px 0 0 0`,
+                'width': `${6 + (4 - rail) * 12}px`,
+                'height': 'calc(50% + 4px)',
+              });
+            } else if (terminateAt.includes('bottom')) {
+              Object.assign(railStyle, {
+                'border-bottom': '8px solid var(--rail-color)',
+                'border-radius': `0 0 0 ${6 * (5 - rail)}px`,
+                'width': `${6 + (4 - rail) * 12}px`,
+                'height': 'calc(50% - 4px)',
+              });
             }
           }
-        `
-      return extra_styles + stationStyle
+        }
+
+        extraStyles += buildStyle(`rail${rail}`, railStyle);
+      }
+
+      extraStyles += buildStyle('station', {
+        '--station-color': entity ? getColor(entity) : 'transparent',
+      });
+
+      return extraStyles;
     ]]]
   tap_action:
     action: none
@@ -225,62 +237,56 @@ rail_interchange_row:
         - background: var(--station-color)
   extra_styles: |
     [[[
-      var extra_styles = ''
-      for (let rail = 0; rail <= 4; rail++) {
-        var style = `
-          #rail${ rail }_top {
-            display: ${ (variables['rail' + rail + '_top_entity'] == null) ? 'none' : 'block' };
-            position: absolute;
-            top: 0;
-            left: ${ rail * 12 }px;
-            width: 0;
-            height: 50%;
-            --rail-color:
-              ${ variables['rail' + rail + '_top_entity'] != null
-                  ? states[variables['rail' + rail + '_top_entity']].attributes[variables.condition_attribute] != undefined
-                    ? states[variables['rail' + rail + '_top_entity']].attributes[variables.condition_attribute] >= variables.condition_threshold
-                      ? variables.mid_color
-                      : variables.on_color
-                    : variables.off_color
-                  : 'transparent'
-              };
-            border-left: 8px solid var(--rail-color);
-          }
-          #rail${ rail }_bottom {
-            display: ${ (variables['rail' + rail + '_bottom_entity'] == null) ? 'none' : 'block' };
-            position: absolute;
-            top: 50%;
-            left: ${ rail * 12 }px;
-            width: 0;
-            height: 50%;
-            --rail-color:
-              ${ variables['rail' + rail + '_bottom_entity'] != null
-                  ? states[variables['rail' + rail + '_bottom_entity']].attributes[variables.condition_attribute] != undefined
-                    ? states[variables['rail' + rail + '_bottom_entity']].attributes[variables.condition_attribute] >= variables.condition_threshold
-                      ? variables.mid_color
-                      : variables.on_color
-                    : variables.off_color
-                  : 'transparent'
-              };
-            border-left: 8px solid var(--rail-color);
-          }
-        `
-        extra_styles = extra_styles + style
+      function getColor(entity) {
+        const attr = entity.attributes[variables.condition_attribute];
+        if (typeof attr == 'undefined' || attr == null) {
+          return variables.off_color;
+        } else if (attr >= variables.condition_threshold) {
+          return variables.mid_color;
+        } else {
+          return variables.on_color;
+        }
       }
-      var stationStyle = `
-        #station {
-          --station-color:
-            ${ entity != null
-                ? entity.attributes[variables.condition_attribute] != undefined
-                  ? entity.attributes[variables.condition_attribute] >= variables.condition_threshold
-                    ? variables.mid_color
-                    : variables.on_color
-                  : variables.off_color
-                : 'transparent'
-            }
-          }
-        `
-      return extra_styles + stationStyle
+
+      function buildStyle(id, styleObject) {
+        const styles = Object.keys(styleObject).map((key) => `${key}:${styleObject[key]}`).join(';');
+        return `#${id}{${styles}}`;
+      }
+
+      let extraStyles = '';
+
+      for (let rail = 0; rail <= 4; rail++) {
+        const railTopEntity = variables[`rail${rail}_top_entity`];
+        const railBottomEntity = variables[`rail${rail}_bottom_entity`];
+
+        extraStyles += buildStyle(`rail${rail}_top`, {
+          'display': railTopEntity == null ? 'none' : 'block',
+          'position': 'absolute',
+          'top': '0',
+          'left': `${rail * 12}px`,
+          'width': '0',
+          'height': '50%',
+          'border-left': '8px solid var(--rail-color)',
+          '--rail-color': railTopEntity != null ? getColor(states[railTopEntity]) : 'transparent',
+        });
+
+        extraStyles += buildStyle(`rail${rail}_bottom`, {
+          'display': railBottomEntity == null ? 'none' : 'block',
+          'position': 'absolute',
+          'top': '50%',
+          'left': `${rail * 12}px`,
+          'width': '0',
+          'height': '50%',
+          'border-left': '8px solid var(--rail-color)',
+          '--rail-color': railBottomEntity != null ? getColor(states[railBottomEntity]) : 'transparent',
+        });
+      }
+
+      extraStyles += buildStyle('station', {
+        '--station-color': entity ? getColor(entity) : 'transparent',
+      });
+
+      return extraStyles;
     ]]]
 
 
